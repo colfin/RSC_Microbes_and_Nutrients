@@ -1,0 +1,784 @@
+---
+title: "Town Creek RSC 16S, denitrification, nutrients, and more"
+author: "Colin G. Finlay"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    df_print: paged
+---
+# Setup
+
+```{r setup, include=FALSE}
+rm(list=ls())
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE)
+#use to set working directory 
+knitr::opts_knit$set(root.dir="~/GitHub/RSC_Microbes_and_Nutrients/analyses/")
+```
+
+# Load packages and functions
+
+```{r load packages and functions, include FALSE }
+#Set source R tools
+source("../bin/DiversityFunctions.R")
+source("../bin/MothurTools.R")
+
+#load required packages
+require("vegan")
+require("tidyverse")
+require("reshape2")
+require("ecodist")
+require("ggpubr")
+require("grid")
+require("rstatix")
+require("NSM3")
+require("ggpmisc")
+require("funrar")
+require("glue")
+require("sf")
+require("NSM3")
+require("gdm")
+require("ARTool")
+```
+
+```{r Bioconductor install and load}
+#if (!require("BiocManager", quietly = TRUE))
+   # install.packages("BiocManager")
+#BiocManager::install(version = "3.22")
+
+require("BiocManager")
+```
+
+```{r Phyloseq install and load}
+#source("https://raw.githubusercontent.com/joey711/phyloseq/master/inst/scripts/installer.R",
+    #   local = TRUE)
+
+#install_phyloseq(branch = "github")
+
+require("phyloseq")
+
+packageVersion('phyloseq')
+```
+
+```{r Standard error and confidence intervals}
+#Set Std Err and Conf Int
+se <- function(x, ...) {
+  sd(x, na.rm = TRUE)/sqrt(length(na.omit(x)))
+}
+ci <- function(x, ...) {
+  1.96 * sd(x, na.rm = TRUE)
+}
+```
+
+# Load files
+
+```{r read in data files}
+# Shared file (OTU) from Mothur Februrary 2025 batch run (original shared filed processed in 'CNH2_AgHC_LD_16S.Rmd')
+otu_batch <- read.csv("../data/Mothur/OTU/otu_SharedFile_TC_and_TarPam.csv")
+```
+
+# Wrangle
+
+```{r}
+# Set row names using mis-formatted column X
+rownames(otu_batch) <- otu_batch$X
+rownames(otu_batch)
+
+# Remove column X now that row names are set
+otu_batch <- otu_batch[,-1]
+```
+
+# QC OTUs per sample
+
+```{r Visualize Town Creek and Tar Pam samples}
+# 1. Check dimensions
+dim(otu_batch) # 139, 164,672
+
+# 2. Prepare data for plotting
+d_otu_4plot <- as.data.frame(otu_batch)
+d_otu_4plot$colsum <- rowSums(d_otu_4plot) 
+d_otu_4plot$group <- rownames(d_otu_4plot)
+
+# 3. Plot and save OTUs per sample figure
+p_TC_OTUs <- ggplot(d_otu_4plot, aes(x = reorder(group, -colsum), y = colsum)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  # Add the count labels
+  geom_text(aes(label = colsum), hjust = -0.2, size = 3.5) + 
+  coord_flip() +
+  theme_minimal() +
+  # Expand the y-axis (which is horizontal now) slightly to make room for the labels
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(x = "", y = "", title = "")
+
+p_TC_OTUs
+
+#ggsave("../figures/MothurCheck_Feb26_batch/TC_and_TarPam_OTUs.pdf", plot=p_TC_OTUs, device="pdf", scale=1, width= 200, height= 500, units = "cm", dpi=600, limitsize=F, bg="white")
+```
+```{r min and max OTU counts}
+# 1. Calculate row sums (excluding the first column if it's the ID)
+# Assuming SampleID is column 1 and the rest are counts:
+total_counts <- rowSums(otu_batch) 
+
+# 2. Find the index of the max and min values
+max_index <- which.max(total_counts)
+min_index <- which.min(total_counts)
+
+# 3. Extract the Sample IDs using the index
+max_sample_id <- rownames(otu_batch)[max_index]
+min_sample_id <- rownames(otu_batch)[min_index]
+
+# Print results
+print(paste("Largest Sample ID:", max_sample_id, "| Total:", total_counts[max_index])) # GSF1058_TarPam_02 | Total: 400458
+print(paste("Smallest Sample ID:", min_sample_id, "| Total:", total_counts[min_index])) # GSF1058_TC_48 | Total: 70
+```
+
+```{r Drop all TarPam samples}
+# 1. Identify rows that contain "_TarPam_"
+# grepl returns TRUE for matches, FALSE for non-matches
+is_tarpam <- grepl("_TarPam_", rownames(otu_batch))
+
+# 2. Subset to keep only the rows that do NOT have the pattern
+otu_noTarPam <- otu_batch[!is_tarpam, ]
+
+# 3. Sanity Check: Verify the counts
+print(paste("Original rows:", nrow(otu_batch)))
+print(paste("Rows removed:", sum(is_tarpam)))
+print(paste("Remaining rows:", nrow(otu_noTarPam)))
+```
+
+```{r Visualize Town Creek samples}
+# 1. Check dimensions
+dim(otu_noTarPam) # 112, 164,672
+
+# 2. Prepare data for plotting
+d2_otu_4plot <- as.data.frame(otu_noTarPam)
+d2_otu_4plot$colsum <- rowSums(d2_otu_4plot) 
+d2_otu_4plot$group <- rownames(d2_otu_4plot)
+
+# 3. Plot and save OTUs per sample figure
+p_TC_OTUs_2 <- ggplot(d2_otu_4plot, aes(x = reorder(group, -colsum), y = colsum)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  # Add the count labels
+  geom_text(aes(label = colsum), hjust = -0.2, size = 3.5) + 
+  coord_flip() +
+  theme_minimal() +
+  # Expand the y-axis (which is horizontal now) slightly to make room for the labels
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(x = "", y = "", title = "")
+
+p_TC_OTUs_2
+
+#ggsave("../figures/MothurCheck_Feb26_batch/TC_OTUs.pdf", plot=p_TC_OTUs_2, device="pdf", scale=1, width= 200, height= 400, units = "cm", dpi=600, limitsize=F, bg="white")
+```
+
+Lowest 4 OTU counts are all water (GSF1058_TC_48, GSF1058_TC_50, GSF1058_TC_51, GSF1058_TC_49), and ≤ 425 OTUs. From there, 5th lowest is 7319 OTUs. Plan to drop all water samples before rarefying.
+
+## Rarefaction
+
+```{r rarefaction}
+#Rarefy
+#Set min sample number
+min.N <- min(rowSums(otu4))
+min.N # 9 OTUs
+
+# new df wich drops the sample with only 2 otu hits:
+otu5 <- otu4[rownames(otu4) != "AGLD004bc093", ]
+
+# new min sample number
+min.N_3 <- min(rowSums(otu5))
+min.N_3 # 10 OTUs
+
+#graph of read counts
+d2<-as.data.frame(otu5)
+d2$colsum <- colSums(t(d2))
+d2$group <- rownames(d2)
+p3<-ggplot(d2, aes(x=group,y=colsum))+geom_bar(stat="identity")+coord_flip()
+p3
+```
+
+```{r Gemini rarefaction}
+# --- Start here with your 'otu2' data frame ---
+
+# 3. Find the minimum sample size (library depth) for rarefaction
+# We calculate the total counts for each sample (row)
+sample_sums <- rowSums(otu3)
+
+# We find the smallest sample sum to use as our depth
+min_depth <- min(sample_sums)
+
+# It's good practice to print this depth
+print(paste("Rarefying all samples to a depth of:", min_depth, "reads"))
+
+# 4. Set a random seed for reproducibility
+# Rarefaction involves random subsampling. Setting a seed ensures
+# that you get the exact same rarefied data every time you run the code.
+set.seed(42) 
+
+# 5. Perform rarefaction
+# The rrarefy() function takes the community data (otu2) and
+# the subsampling depth (min_depth)
+otu_rarefied <- rrarefy(otu3, sample = min_depth)
+
+# 6. (OPTIONAL) Check the new row sums to confirm
+print("New row sums after rarefaction:")
+print(rowSums(otu_rarefied))
+
+# 'otu_rarefied' is your new data frame with rarefied counts
+```
+
+Relative abundance using funrar:
+- use the package "funrar", and function make_relative() to do relative abundance calculations
+  - yields same results as our for loops
+  - has publication: https://doi.org/10.1111/ddi.12629 
+- install.packages("funrar")
+- require("funrar")
+- relative_abundance <- make_relative(as.matrix(Numerical))
+```{r relative abundance}
+otu_rel <- make_relative(as.matrix(otu_rarefied))
+```
+
+```{r read in meta data}
+#Read in design file
+meta <- read.csv("../data/Design_HC_LD.csv")
+```
+
+```{r wrangle meta data}
+# remove underscores form meta sampleIDs and make row names
+rownames(meta) <- gsub(pattern = "_", replacement = "", x = meta$SampleID)
+
+# remove barcodes from otu_rel row names
+# This selects and keeps only the first 7 characters of each row name
+rownames(otu_rel) <- substr(rownames(otu_rel), start = 1, stop = 7)
+
+# Get the row names from 'otu_rel' (the data frame with fewer rows)
+matching_samples <- rownames(otu_rel)
+
+# 1. Filter and reorder 'meta' to match 'otu_rel'
+meta_filtered <- meta[matching_samples, ]
+
+# 2. Now cbind the two data frames, which have identical row names and order
+meta_otu <- cbind(meta_filtered, otu_rel)
+
+# (Optional) Check the dimensions to confirm
+dim(meta_otu) 
+# This should show 49 rows
+```
+
+```{r set factors}
+meta_otu$Site <- as.factor(meta_otu$Site)
+meta_otu$Field_or_Buffer <- as.factor(meta_otu$Field_or_Buffer)
+```
+
+# PERMANOVA
+
+```{r PERMANOVA}
+# PERMANOVA:
+metaotu.ad <- adonis2(meta_otu[,-c(1:5)] ~ Site * Field_or_Buffer, method = "bray", data = meta_otu, perm=10000, set.seed=42, by = "terms")
+metaotu.ad
+
+metaotu.ad.2 <- adonis2(meta_otu[,-c(1:5)] ~ Site * Field_or_Buffer * Treatment_salt, method = "bray", data = meta_otu, perm=10000, set.seed=42, by = "terms")
+metaotu.ad.2 # The interaction between field/buffer and Treatment_salt makes this model unusable
+
+metaotu.ad.3 <- adonis2(meta_otu[,-c(1:5)] ~ Treatment_salt, method = "bray", data = meta_otu, perm=10000, set.seed=42, by = "terms")
+metaotu.ad.3 # Treatment_salt overlaps with field/buffer categories too much, not very informative
+
+# For treatment_salt (Hyde) and maybe Field_Location (if not redundant), analyze within Hyde (and maybe within Pitt)
+```
+
+# Denitrification and soil parameters
+
+```{r denit wrangling}
+# remove NO_ACET
+HC_denit_acet <- HC_denit %>%
+  dplyr::filter(Acetylene == "ACET", .preserve = TRUE)
+
+LD_denit_acet <- LD_denit %>%
+  dplyr::filter(Acetylene == "ACET", .preserve = TRUE)
+
+# for HC, remove extra samples 1 through 4
+# Create a vector of the SampleIDs to exclude
+values_to_remove <- c("AG_HC_001_ACET", "AG_HC_002_ACET", "AG_HC_003_ACET", "AG_HC_004_ACET")
+
+HC_denit_acet_filtered <- HC_denit_acet[!(HC_denit_acet$Sample_ID %in% values_to_remove), ]
+
+# first, need to simplify so column number and names match
+HC_denit_simple <- HC_denit_acet_filtered[,c(1,6)]
+LD_denit_simple <- LD_denit_acet[, c(1,8)]
+
+# rbind HC and LD
+comb_denit_simple <- rbind(HC_denit_simple, LD_denit_simple)
+
+# row names to match PCoA
+# get rid of underscores
+rownames(comb_denit_simple) <- gsub(pattern = "_", replacement = "", x = comb_denit_simple$Sample_ID)
+
+# This selects and keeps only the first 7 characters of each row name
+rownames(comb_denit_simple) <- substr(rownames(comb_denit_simple), start = 1, stop = 7)
+```
+
+```{r soil wrangling}
+#Wet_dry_mass
+# add dry_proportion (dry/wet)
+Wet_dry_mass$dry_proportion <- Wet_dry_mass$dry_soil_g / Wet_dry_mass$wet_soil_g
+
+# add percent soil moisture
+Wet_dry_mass$PercentMoisture <- ((Wet_dry_mass$wet_soil_g - Wet_dry_mass$dry_soil_g) / Wet_dry_mass$wet_soil_g) * 100
+
+#N_inorganic
+# add dry_proportion column
+# replace NAs in N inorganic with zeros
+N_inorganic[, c("NH4_uM", "NH4_mg.L", "NO3_NO2_uM", "NO3_NO2_mg.L")] <- lapply(
+  N_inorganic[, c("NH4_uM", "NH4_mg.L", "NO3_NO2_uM", "NO3_NO2_mg.L")],
+  function(x) ifelse(is.na(x), 0, x))
+
+N_inorganic$dry_proportion <- Wet_dry_mass$dry_proportion
+
+# Calculate dry soil input for KCl extraction (dry soil input = wet g * dry_proportion)
+N_inorganic$dry_soil_g <- N_inorganic$KCl_field_moist_g_soil * N_inorganic$dry_proportion
+
+# divide mg/L by dry g for final unit to use in simplified data frame
+N_inorganic$NH4_mg.L.gDM <- N_inorganic$NH4_mg.L / N_inorganic$dry_soil_g
+
+N_inorganic$NO3_NO2_mg.L.gDM <- N_inorganic$NO3_NO2_mg.L / N_inorganic$dry_soil_g
+
+#pH
+  # already good
+
+#C_N_Sal_EC
+# C:N ratio
+C_N_Sal_EC$CN <- C_N_Sal_EC$C_perc / C_N_Sal_EC$N_perc
+```
+
+```{r simplify, rbind, row names}
+# first, need to simplify so column number and names match
+Soil_moisture_simp <- Wet_dry_mass[,c(1,5)]
+N_inorganic_simp <- N_inorganic[, c(1,9,10)]
+
+# row names to match PCoA
+# get rid of underscores
+rownames(Soil_moisture_simp) <- gsub(pattern = "_", replacement = "", x = Soil_moisture_simp$SampleID)
+rownames(N_inorganic_simp) <- gsub(pattern = "_", replacement = "", x = N_inorganic_simp$Sample)
+rownames(pH) <- gsub(pattern = "_", replacement = "", x = pH$SampleID)
+rownames(C_N_Sal_EC) <- gsub(pattern = "_", replacement = "", x = C_N_Sal_EC$Sample)
+
+# This selects and keeps only the first 7 characters of each row name
+rownames(Soil_moisture_simp) <- substr(rownames(Soil_moisture_simp), start = 1, stop = 7)
+rownames(N_inorganic_simp) <- substr(rownames(N_inorganic_simp), start = 1, stop = 7)
+rownames(pH) <- substr(rownames(pH), start = 1, stop = 7)
+rownames(C_N_Sal_EC) <- substr(rownames(C_N_Sal_EC), start = 1, stop = 7)
+```
+
+```{r combine all and filter for envfit}
+# combine denit and all soil data frames (cbind)
+denit_soil_all <- cbind(comb_denit_simple, Soil_moisture_simp, N_inorganic_simp, pH, C_N_Sal_EC)
+
+# remove sample ID columns
+denit_soil_all <- denit_soil_all[,-c(1, 3, 5, 8, 10)]
+
+# create new data frame that only contains 16S samples. This will be the envfit data frame
+denit_soil_filtered <- denit_soil_all[rownames(denit_soil_all) %in% rownames(otu_rel), ]
+```
+
+```{r soil stat assumptions}
+# denit_soil_all with meta data:
+denit_soil_all_meta <- cbind(meta, denit_soil_all)
+
+denit_soil_all_meta$log_denit <- log10(denit_soil_all_meta$Denitrification_rate)
+denit_soil_all_meta$log_EC <- log10(denit_soil_all_meta$EC_uS.cm)
+denit_soil_all_meta$log_moisture <- log10(denit_soil_all_meta$PercentMoisture)
+
+# Normality:
+denit_soil_all_meta %>%
+  shapiro_test(Denitrification_rate)
+  # Not normally distributed
+
+denit_soil_all_meta %>%
+  shapiro_test(log_denit)
+  # Normally distributed!
+
+denit_soil_all_meta %>%
+  shapiro_test(EC_uS.cm)
+  # Not normally distributed
+
+denit_soil_all_meta %>%
+  shapiro_test(log_EC)
+  # Not normally distributed
+
+denit_soil_all_meta %>%
+  shapiro_test(PercentMoisture)
+  # Not normally distributed
+
+denit_soil_all_meta %>%
+  shapiro_test(log_moisture)
+  # Not normally distributed
+
+denit_soil_all_meta %>%
+  shapiro_test(N_perc)
+  # Not normally distributed
+
+denit_soil_all_meta %>%
+  shapiro_test(C_perc)
+  # Not normally distributed
+
+denit_soil_all_meta %>%
+  shapiro_test(CN)
+  # Not normally distributed
+
+denit_soil_all_meta %>%
+  shapiro_test(NH4_mg.L.gDM)
+  # Not normally distributed
+
+denit_soil_all_meta %>%
+  shapiro_test(NO3_NO2_mg.L.gDM)
+  # Not normally distributed
+
+denit_soil_all_meta %>%
+  shapiro_test(mean_pH)
+  # Not normally distributed
+
+  # QQ plots:
+ggqqplot(denit_soil_all_meta, "log_denit") # May be acceptable
+
+ggqqplot(denit_soil_all_meta, "log_EC") # Bad, but borderline acceptable
+
+ggqqplot(denit_soil_all_meta, "log_moisture") # no parametric possible
+
+ggqqplot(denit_soil_all_meta, "CN")
+  # Shapiro failed but QQ looks acceptable for parametric stats
+
+```
+
+```{r ART ANOVA}
+denit_soil_all_meta$Site <- as.factor(denit_soil_all_meta$Site)
+denit_soil_all_meta$Field_or_Buffer <- as.factor(denit_soil_all_meta$Field_or_Buffer)
+
+m.art = art(Denitrification_rate ~ Site*Field_or_Buffer, data = denit_soil_all_meta)
+anova(m.art)
+```
+
+# Soil boxplots
+
+## Denit, Moisture, EC 3-panel
+
+```{r plotting}
+# add combined site and field or buffer
+denit_soil_all_meta$Site_field_buff <- paste(denit_soil_all_meta$Site, denit_soil_all_meta$Field_or_Buffer, sep = "_")
+
+denit_soil_all_meta$Site_field_buff <- as.factor(denit_soil_all_meta$Site_field_buff)
+
+# Kruskal-Wallis test on Treatment, and multiple comparisons:
+denit_kruskal<- compare_means(Denitrification_rate~Site_field_buff, denit_soil_all_meta, method = "kruskal.test")
+
+denit_multipleComparisons<- compare_means(Denitrification_rate~Site_field_buff, denit_soil_all_meta, method = "wilcox.test", p.adjust.method = "fdr")
+
+# Adjustments for plotting:
+denit_multipleComparisons <- add_significance(denit_multipleComparisons, p.col = "p.adj", output.col = "p.adj.signif", cutpoints = c(0, 1e-04, 0.001, 0.01, 0.05, Inf), symbols = c("****", "***", "**", "*", "ns"))
+
+# Turn into data frame:
+denit_MultComp.DF <- as.data.frame(denit_multipleComparisons)
+
+# SDCFlig
+SDCFlig_denit <- pSDCFlig(x = denit_soil_all_meta$Denitrification_rate, g = denit_soil_all_meta$Site_field_buff, method = "Monte Carlo", n.mc = 10000)
+SDCFlig_denit
+
+# Add on SDCFlig p-values:
+denit_MultComp.DF$SDCF_p <- c(SDCFlig_denit$p.val)
+
+# Symbols for plotting:
+denit_MultComp.DF <- add_significance(denit_MultComp.DF, p.col = "SDCF_p", output.col = "p.SDCF.signif", cutpoints = c(0, 1e-04, 0.001, 0.01, 0.05, Inf), symbols = c("****", "***", "**", "*", "ns"))
+
+# Letters for plotting
+denit_letters <- data.frame(
+  Site_field_buff = c("HydeCo_buffer", "HydeCo_field", "PittCo_buffer", "PittCo_field"),
+  Letters = c("a", "a", "b", "c")
+)
+
+
+# Export the data frames to a .csv file
+#write.csv(N2O_MultComp.DF, file = "../figures/pub/tables/Kruskal_Treatment/multiple_comparisons/N2O_MultComp.csv", row.names = T)
+
+# Weird 'hide.ns' behavior patch:
+#N2O_MultComp.DF$p[4] <- 1.0
+
+# Plotting:
+plot.denit <- ggplot(denit_soil_all_meta, aes(x=Site_field_buff, y=Denitrification_rate)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(size = 2, position = position_jitterdodge()) +
+  theme_bw() +
+  #Remove plot grid lines
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  #Set axis title and text properties, tick marks, and labels
+  theme(text=element_text(size=20),axis.title=element_text(size=20,face="bold"),
+          axis.text=element_text(size=20),  
+          axis.title.y=element_text(margin=margin(r=10)),
+          axis.text.x = element_text(angle = 45, hjust = 1), panel.border = element_rect(colour = "black",size=1), strip.text = element_text(size = 20), legend.position="right", legend.title = element_text(size=20), legend.text=element_text(size=20)) + 
+          theme(axis.ticks.length=unit(0.3,"cm")) + 
+          labs(x = "", y = expression(paste("ng N"[2],"O g"^{-1}, " h"^{-1})), title="") +
+  #scale_x_discrete(labels=c("Dry", "Interim", "Wet"))+
+  theme(rect=element_rect(fill="transparent"))+
+  theme(plot.background = element_rect(color=NA))+
+  #stat_pvalue_manual(data = denit_MultComp.DF, comparisons = list(c("HydeCo_buffer", "HydeCo_field"), c("HydeCo_buffer", "PittCo_buffer"), c("HydeCo_buffer", "PittCo_field"), c("HydeCo_field", "PittCo_buffer"), c("HydeCo_field", "PittCo_field"), c("PittCo_buffer", "PittCo_field")), label = "p.adj.signif", size = 10, vjust = 1, hide.ns = "p", y.position = max(denit_soil_all_meta$Denitrification_rate), step.increase = 0.1)
+  geom_text(data = denit_letters, aes(x = Site_field_buff, y = max(denit_soil_all_meta$Denitrification_rate) + 5000, label = Letters), size = 8)
+
+ 
+plot.denit
+
+#ggsave("../figures/denit_boxplot.png", plot=plot.denit, device="png", path=NULL, scale=1, width=9, height=5, dpi=600, limitsize=TRUE, bg="white")
+```
+
+```{r denit site facet plot}
+# Rename factor levels
+denit_soil_all_meta$Site <- factor(denit_soil_all_meta$Site,
+                                   levels = c("HydeCo", "PittCo"),
+                                   labels = c("Hyde County", "Pitt County"))
+# Letters for plotting
+denit_letters.1a <- data.frame(
+  Site = c("Hyde County", "Hyde County", "Pitt County", "Pitt County"),
+  Field_or_Buffer = c("buffer", "field", "buffer", "field"),
+  Letters = c("a", "a", "b", "c")
+)
+
+
+# Plotting:
+plot.denit.1a <- ggplot(denit_soil_all_meta, aes(x=Field_or_Buffer, y=Denitrification_rate)) +
+  facet_wrap(vars(Site))+
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(size = 2, position = position_jitterdodge()) +
+  theme_bw() +
+  #Remove plot grid lines
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  #Set axis title and text properties, tick marks, and labels
+  theme(text=element_text(size=20),axis.title=element_text(size=20,face="bold"),
+          axis.text=element_text(size=20),  
+          axis.title.y=element_text(margin=margin(r=10)),
+          axis.text.x = element_text(angle = 45, hjust = 1), panel.border = element_rect(colour = "black",size=1), strip.text = element_text(size = 20), legend.position="right", legend.title = element_text(size=20), legend.text=element_text(size=20)) + 
+          theme(axis.ticks.length=unit(0.3,"cm")) + 
+          labs(x = "", y = expression(paste("ng N"[2],"O g"^{-1}, " h"^{-1})), title="") +
+  theme(rect=element_rect(fill="transparent"))+
+  theme(plot.background = element_rect(color=NA))+
+  theme(axis.text.x = element_blank())+
+  theme(axis.ticks.x = element_blank())+
+  coord_cartesian(ylim = c(-4, 26000))+
+  geom_text(data = denit_letters.1a, aes(x = Field_or_Buffer, y = max(denit_soil_all_meta$Denitrification_rate) + 4000, label = Letters), size = 8)
+
+ 
+plot.denit.1a
+```
+
+```{r moisture stats and plot}
+# Kruskal-Wallis test on Treatment, and multiple comparisons:
+moisture_kruskal<- compare_means(PercentMoisture~Site_field_buff, denit_soil_all_meta, method = "kruskal.test")
+
+# Plotting:
+plot.moist.b <- ggplot(denit_soil_all_meta, aes(x=Field_or_Buffer, y=PercentMoisture)) +
+  facet_wrap(vars(Site))+
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(size = 2, position = position_jitterdodge()) +
+  theme_bw() +
+  #Remove plot grid lines
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  #Set axis title and text properties, tick marks, and labels
+  theme(text=element_text(size=20),axis.title=element_text(size=20,face="bold"),
+          axis.text=element_text(size=20),  
+          axis.title.y=element_text(margin=margin(r=10)),
+          axis.text.x = element_text(angle = 45, hjust = 1), panel.border = element_rect(colour = "black",size=1), strip.text = element_text(size = 20), legend.position="right", legend.title = element_text(size=20), legend.text=element_text(size=20)) + 
+          theme(axis.ticks.length=unit(0.3,"cm")) + 
+          labs(x = "", y = expression(paste("% soil moisture")), title="") +
+  theme(rect=element_rect(fill="transparent"))+
+  theme(axis.text.x = element_blank())+
+  theme(axis.ticks.x = element_blank())+
+  theme(plot.background = element_rect(color=NA))
+
+ 
+plot.moist.b
+```
+
+```{r EC stats and plot}
+# Kruskal-Wallis test on Treatment, and multiple comparisons:
+EC_kruskal<- compare_means(EC_uS.cm~Site_field_buff, denit_soil_all_meta, method = "kruskal.test")
+
+EC_multipleComparisons<- compare_means(EC_uS.cm~Site_field_buff, denit_soil_all_meta, method = "wilcox.test", p.adjust.method = "fdr")
+
+# Adjustments for plotting:
+EC_multipleComparisons <- add_significance(EC_multipleComparisons, p.col = "p.adj", output.col = "p.adj.signif", cutpoints = c(0, 1e-04, 0.001, 0.01, 0.05, Inf), symbols = c("****", "***", "**", "*", "ns"))
+
+# Turn into data frame:
+EC_MultComp.DF <- as.data.frame(EC_multipleComparisons)
+
+# Letters for plotting
+EC_letters <- data.frame(
+  Site_field_buff = c("HydeCo_buffer", "HydeCo_field", "PittCo_buffer", "PittCo_field"),
+  Letters = c("a", "a", "b", "c")
+)
+
+# SDCFlig
+SDCFlig_EC <- pSDCFlig(x = denit_soil_all_meta$EC_uS.cm, g = denit_soil_all_meta$Site_field_buff, method = "Monte Carlo", n.mc = 10000)
+SDCFlig_EC
+
+# Add on SDCFlig p-values:
+EC_MultComp.DF$SDCF_p <- c(SDCFlig_EC$p.val)
+
+# Symbols for plotting:
+EC_MultComp.DF <- add_significance(EC_MultComp.DF, p.col = "SDCF_p", output.col = "p.SDCF.signif", cutpoints = c(0, 1e-04, 0.001, 0.01, 0.05, Inf), symbols = c("****", "***", "**", "*", "ns"))
+
+# Letters for plotting
+EC_letters.1a <- data.frame(
+  Site = c("Hyde County", "Hyde County", "Pitt County", "Pitt County"),
+  Field_or_Buffer = c("buffer", "field", "buffer", "field"),
+  Letters = c("ab", "a", "b", "c")
+)
+
+# Plotting:
+plot.EC.c <- ggplot(denit_soil_all_meta, aes(x=Field_or_Buffer, y=EC_uS.cm)) +
+  facet_wrap(vars(Site))+
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(size = 2, position = position_jitterdodge()) +
+  theme_bw() +
+  #Remove plot grid lines
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  #Set axis title and text properties, tick marks, and labels
+  theme(text=element_text(size=20),axis.title=element_text(size=20,face="bold"),
+          axis.text=element_text(size=20),  
+          axis.title.y=element_text(margin=margin(r=10)),
+          axis.text.x = element_text(angle = 45, hjust = 1), panel.border = element_rect(colour = "black",size=1), strip.text = element_text(size = 20), legend.position="right", legend.title = element_text(size=20), legend.text=element_text(size=20)) + 
+          theme(axis.ticks.length=unit(0.3,"cm")) + 
+          labs(x = "", y = expression(paste("EC (µS cm"^{-1}, ")")), title="") +
+  theme(rect=element_rect(fill="transparent"))+
+  theme(plot.background = element_rect(color=NA))+
+  coord_cartesian(ylim = c(0, 3200))+
+  geom_text(data = EC_letters.1a, aes(x = Field_or_Buffer, y = max(denit_soil_all_meta$EC_uS.cm) + 500, label = Letters), size = 8)
+
+ 
+plot.EC.c
+
+```
+
+```{r}
+denit_moist_EC_3panel <- ggarrange(plot.denit.1a, plot.moist.b, plot.EC.c, ncol = 1, nrow = 3, align = "hv",labels = c("(a)","(b)","(c)"), legend = "none")
+
+denit_moist_EC_3panel
+
+#ggsave("../figures/denit_moist_EC_3panel.png", plot=denit_moist_EC_3panel, device="png", path=NULL, scale=1, width=10, height=12, dpi=600, limitsize=TRUE, bg="white")
+```
+
+
+# PCoA
+
+```{r Calculate distance matrix and PCoA components without field, end samples only}
+# Bray-Curtis distance matrix:
+otu.rel.dist<-vegdist(otu_rel, method="bray")
+
+# Principal Coordinates Analysis
+otu.rel.dist.pcoa <- cmdscale(otu.rel.dist, k=2, eig=TRUE, add=TRUE)
+# Classical (Metric) Multidimensional Scaling; returns PCoA coordinates
+# eig=TRUE returns eigenvalues; k = # of dimensions to calculate
+
+explainvar1a <- round(otu.rel.dist.pcoa$eig[1] / sum(otu.rel.dist.pcoa$eig), 3) * 100
+explainvar2a <- round(otu.rel.dist.pcoa$eig[2] / sum(otu.rel.dist.pcoa$eig), 3) * 100
+sum.eiga <- sum(explainvar1a, explainvar2a)
+
+explainvar1a # 15.8%
+explainvar2a # 6%
+sum.eiga # 21.8%
+```
+
+```{r PCoA data frames}
+pcoa.groups <- paste(meta_otu$Site, meta_otu$Field_or_Buffer, sep = "_")
+pcoa.points <- data.frame(otu.rel.dist.pcoa$points, group = pcoa.groups)
+
+# Calculate Centroids (mean and SE)
+pcoa.L.centroids <- reshape2::melt(pcoa.points, id="group", measure.vars = c("X1", "X2"))
+pcoa.centroids <- acast(pcoa.L.centroids, variable ~ group, mean)
+pcoa.centroids.se <- acast(pcoa.L.centroids, variable ~ group, se)
+pcoa.centroids.sd <- acast(pcoa.L.centroids, variable ~ group, sd)
+
+# Combine
+pcoa.cent.dataframe <- cbind(t(pcoa.centroids), t(pcoa.centroids.se))
+colnames(pcoa.cent.dataframe) <- c("V1", "V2", "V1e", "V2e")
+
+# Adding columns with the factors. H: hydrologic history
+pcoa_Site <- c("HydeCo", "HydeCo", "PittCo", "PittCo")
+pcoa_field_or_buff <- c("buffer", "field", "buffer", "field")
+
+# create and add to "trts" data frame
+pcoa.cent.dataframe.trts <- as.data.frame(pcoa.cent.dataframe) 
+pcoa.cent.dataframe.trts$Site <- as.factor(pcoa_Site)
+pcoa.cent.dataframe.trts$Field_or_Buffer <- as.factor(pcoa_field_or_buff)
+pcoa.cent.dataframe.trts$centroid_or_sample <- "centroid"
+
+# Add in points to data frame:
+pcoa.points_ForPlot <- pcoa.points
+colnames(pcoa.points_ForPlot) <- c("V1", "V2", "group")
+
+# Add labels to match ...cent.dataframe.trts
+pcoa.points_ForPlot$Site <- meta_otu$Site
+pcoa.points_ForPlot$Field_or_Buffer <- meta_otu$Field_or_Buffer
+
+#remove "group" column
+pcoa.points_ForPlot <- pcoa.points_ForPlot[, -3]
+#add V1e and V2e as zeros:
+pcoa.points_ForPlot$V1e <- numeric(49)
+pcoa.points_ForPlot$V2e <- numeric(49)
+# Add column to distinguish sample points from centroids, and later use to set alpha in plot
+pcoa.points_ForPlot$centroid_or_sample <- "sample"
+
+#Merge:
+centroids_points_merged <- rbind(pcoa.cent.dataframe.trts, pcoa.points_ForPlot)
+
+# Add combined site and field or buffer column:
+centroids_points_merged$Site_field_buff <- paste(centroids_points_merged$Site, centroids_points_merged$Field_or_Buffer, sep = "_")
+
+centroids_points_merged$Site_field_buff <- as.factor(centroids_points_merged$Site_field_buff)
+```
+
+```{r envfit}
+# pcoa points data frame for envfit
+pcoa_DF <- as.data.frame(otu.rel.dist.pcoa$points)
+
+#Run envfit with new Soil data (SSF = Soil Start & Finish):
+fit <- envfit(pcoa_DF, denit_soil_filtered, permutations = 10000, set.seed(42))
+fit
+
+A_fit <-as.list(fit$vectors)
+vec <- as.data.frame(fit$vectors$arrows*sqrt(fit$vectors$r)*1)
+p_fit <- as.data.frame(A_fit$pvals)
+vec$pvals <- A_fit$pvals
+vec <- subset(vec, pvals<=0.05)
+
+vec$labels <- c("%moisture", "EC")
+```
+
+```{r PCoA plot site and field or buffer}
+#Plot using ggplot2
+df <- as.data.frame(centroids_points_merged)
+
+plot_pcoa <- ggplot(df, aes(x=V1, y=V2, shape=Site_field_buff)) + 
+  geom_errorbarh(aes(xmax=V1+V1e, xmin=V1-V1e, height=0.003), colour="black") +    
+  geom_errorbar(aes(ymax=V2+V2e, ymin=V2-V2e, width=0.003), colour="black") +   
+  geom_point(aes(shape = Site_field_buff, alpha = centroid_or_sample, size = centroid_or_sample), stroke=2) +  
+  theme_bw() +
+  scale_size_manual(values = c(7, 3), name = "Centroid or Sample")+
+  scale_alpha_manual(values = c(1, 0.3), name = "Centroid or Sample")+
+  #scale_color_manual(values=c("black", "#997700", "#004488"), name="Treatment") +
+  scale_shape_manual(values = c(0, 15, 1, 19), name="Site_Buffer") +
+  xlab(glue("PCoA 1 ({explainvar1a}%)")) + ylab(glue("PCoA 2 ({explainvar2a}%)")) + 
+  geom_segment(data=vec, aes(x=0,xend=V1,y=0,yend=V2), linewidth=1, arrow = arrow(length = unit(0.2, "cm")),colour="black", alpha = 0.6, inherit.aes=F)+ 
+ geom_text(data=vec, aes(x=V1, y=V2+0.03), label= vec$labels, size=4, inherit.aes=F)+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  theme(panel.background = element_blank()) + 
+  theme(axis.title = element_text(size=14), axis.text=element_text(size=14), 
+          axis.text.x = element_text(size=14),  axis.text.y = element_text(size=14),
+          panel.border = element_rect(colour = "black", linewidth=1.25)) +
+  theme(axis.ticks.length=unit(0.3,"cm")) + 
+  theme(plot.title=element_text(size=14)) +
+  theme(legend.text=element_text(size=14), legend.title = element_text(size=14))+
+  guides(shape = guide_legend(override.aes = list(size = 4), order = 1), 
+           colour = guide_legend(override.aes = list(pch=16, size = 4), order = 2)) +
+    ggtitle("")
+
+plot_pcoa
+
+#ggsave("../figures/pcoa.png", plot = plot_pcoa, device="png", path=NULL, scale=1, height = 5, width = 9, limitsize = TRUE, dpi = 600)
+```
+
+
+
