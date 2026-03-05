@@ -76,7 +76,7 @@ ci <- function(x, ...) {
 otu_batch <- read.csv("../data/Mothur/OTU/otu_SharedFile_TC_and_TarPam.csv")
 ```
 
-# Wrangle
+# QC OTUs per sample
 
 ```{r}
 # Set row names using mis-formatted column X
@@ -86,8 +86,6 @@ rownames(otu_batch)
 # Remove column X now that row names are set
 otu_batch <- otu_batch[,-1]
 ```
-
-# QC OTUs per sample
 
 ```{r Visualize Town Creek and Tar Pam samples}
 # 1. Check dimensions
@@ -140,9 +138,9 @@ is_tarpam <- grepl("_TarPam_", rownames(otu_batch))
 otu_noTarPam <- otu_batch[!is_tarpam, ]
 
 # 3. Sanity Check: Verify the counts
-print(paste("Original rows:", nrow(otu_batch)))
-print(paste("Rows removed:", sum(is_tarpam)))
-print(paste("Remaining rows:", nrow(otu_noTarPam)))
+print(paste("Original rows:", nrow(otu_batch))) # 139
+print(paste("Rows removed:", sum(is_tarpam))) # 27
+print(paste("Remaining rows:", nrow(otu_noTarPam))) # 112
 ```
 
 ```{r Visualize Town Creek samples}
@@ -170,37 +168,65 @@ p_TC_OTUs_2
 #ggsave("../figures/MothurCheck_Feb26_batch/TC_OTUs.pdf", plot=p_TC_OTUs_2, device="pdf", scale=1, width= 200, height= 400, units = "cm", dpi=600, limitsize=F, bg="white")
 ```
 
+## Drop Town Creek water samples
 Lowest 4 OTU counts are all water (GSF1058_TC_48, GSF1058_TC_50, GSF1058_TC_51, GSF1058_TC_49), and ≤ 425 OTUs. From there, 5th lowest is 7319 OTUs. Plan to drop all water samples before rarefying.
+
+```{r design file for 2015 Town Creek}
+# Read in 2015 design file
+design_2015 <- read.delim("../data/2015_preRSC/TC.design.txt", row.names = 1)
+
+# Correct Sample IDs and Subset Original Design File
+rownames(design_2015) <- gsub("ECU", "GSF1058", rownames(design_2015))
+rownames(design_2015) <- gsub("_0", "_", rownames(design_2015))
+```
+
+
+```{r Drop all water samples}
+# 1. Identify rows where Sample_Type is water (W)
+is_water <- rownames(design_2015)[design_2015$Sample_Type == "W"]
+
+# 2. Subset to keep only the rows that do NOT have the pattern
+otu_TC_sed <- otu_noTarPam[!(rownames(otu_noTarPam) %in% is_water), ]
+
+# 3. Sanity Check: Verify the counts
+print(paste("Original rows:", nrow(otu_noTarPam))) # 112
+print(paste("Rows removed:", sum((rownames(otu_noTarPam) %in% is_water)))) # 34
+print(paste("Remaining rows:", nrow(otu_TC_sed))) # 78
+```
+
+```{r Visualize Town Creek sediment samples}
+# 1. Check dimensions
+dim(otu_TC_sed) # 78, 164,672
+
+# 2. Prepare data for plotting
+d3_otu_4plot <- as.data.frame(otu_TC_sed)
+d3_otu_4plot$colsum <- rowSums(d3_otu_4plot) 
+d3_otu_4plot$group <- rownames(d3_otu_4plot)
+
+# 3. Plot and save OTUs per sample figure
+p_TC_OTUs_3 <- ggplot(d3_otu_4plot, aes(x = reorder(group, -colsum), y = colsum)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  # Add the count labels
+  geom_text(aes(label = colsum), hjust = -0.2, size = 3.5) + 
+  coord_flip() +
+  theme_minimal() +
+  # Expand the y-axis (which is horizontal now) slightly to make room for the labels
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(x = "", y = "", title = "")
+
+p_TC_OTUs_3
+
+#ggsave("../figures/MothurCheck_Feb26_batch/TC_OTUs_SED_ONLY.pdf", plot=p_TC_OTUs_3, device="pdf", scale=1, width= 200, height= 300, units = "cm", dpi=600, limitsize=F, bg="white")
+```
 
 ## Rarefaction
 
-```{r rarefaction}
-#Rarefy
-#Set min sample number
-min.N <- min(rowSums(otu4))
-min.N # 9 OTUs
-
-# new df wich drops the sample with only 2 otu hits:
-otu5 <- otu4[rownames(otu4) != "AGLD004bc093", ]
-
-# new min sample number
-min.N_3 <- min(rowSums(otu5))
-min.N_3 # 10 OTUs
-
-#graph of read counts
-d2<-as.data.frame(otu5)
-d2$colsum <- colSums(t(d2))
-d2$group <- rownames(d2)
-p3<-ggplot(d2, aes(x=group,y=colsum))+geom_bar(stat="identity")+coord_flip()
-p3
-```
-
 ```{r Gemini rarefaction}
-# --- Start here with your 'otu2' data frame ---
+# --- Start here with 'otu_TC_sed' data frame ---
 
-# 3. Find the minimum sample size (library depth) for rarefaction
+# 1. Find the minimum sample size (library depth) for rarefaction
 # We calculate the total counts for each sample (row)
-sample_sums <- rowSums(otu3)
+sample_sums <- rowSums(otu_TC_sed)
 
 # We find the smallest sample sum to use as our depth
 min_depth <- min(sample_sums)
@@ -208,21 +234,21 @@ min_depth <- min(sample_sums)
 # It's good practice to print this depth
 print(paste("Rarefying all samples to a depth of:", min_depth, "reads"))
 
-# 4. Set a random seed for reproducibility
+# 2. Set a random seed for reproducibility
 # Rarefaction involves random subsampling. Setting a seed ensures
 # that you get the exact same rarefied data every time you run the code.
 set.seed(42) 
 
-# 5. Perform rarefaction
+# 3. Perform rarefaction
 # The rrarefy() function takes the community data (otu2) and
 # the subsampling depth (min_depth)
-otu_rarefied <- rrarefy(otu3, sample = min_depth)
+otu_rarefied <- rrarefy(otu_TC_sed, sample = min_depth)
 
-# 6. (OPTIONAL) Check the new row sums to confirm
+# 4. Check the new row sums to confirm
 print("New row sums after rarefaction:")
 print(rowSums(otu_rarefied))
 
-# 'otu_rarefied' is your new data frame with rarefied counts
+# 'otu_rarefied' is the new data frame with rarefied counts
 ```
 
 Relative abundance using funrar:
@@ -236,8 +262,14 @@ Relative abundance using funrar:
 otu_rel <- make_relative(as.matrix(otu_rarefied))
 ```
 
+Switch to StormwaterDenitrificationCF_ASM2.Rmd for template at this point?
+
+# Meta data (design) and wrangling
+
 ```{r read in meta data}
-#Read in design file
+# 2015 design file has already been read in as 'design_2015'
+
+#Read in design file for 2023 RSC DEAs
 meta <- read.csv("../data/Design_HC_LD.csv")
 ```
 
