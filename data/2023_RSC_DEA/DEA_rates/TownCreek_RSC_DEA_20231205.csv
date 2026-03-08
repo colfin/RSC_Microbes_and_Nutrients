@@ -1,0 +1,26 @@
+Sample_ID,Acetylene,RSC,Pool,Up_or_down,Water_column,DEA_time,Denitrification_rate,Unit_rate
+TC_RSC_049_ACET,ACET,in-stream,I1,upstream,submerged,morning,219.1053273,ng N2O g-1 DM hr-1
+TC_RSC_049_NO_ACET,NO_ACET,in-stream,I1,upstream,submerged,morning,81.50048773,ng N2O g-1 DM hr-1
+TC_RSC_050_ACET,ACET,in-stream,I1,upstream,submerged,afternoon,2137.854337,ng N2O g-1 DM hr-1
+TC_RSC_051_ACET,ACET,in-stream,I1,upstream,submerged,morning,54.31418684,ng N2O g-1 DM hr-1
+TC_RSC_052_ACET,ACET,in-stream,I1,upstream,submerged,afternoon,131.3995862,ng N2O g-1 DM hr-1
+TC_RSC_053_ACET,ACET,in-stream,I4,downstream,submerged,afternoon,35.90057212,ng N2O g-1 DM hr-1
+TC_RSC_053_NO_ACET,NO_ACET,in-stream,I4,downstream,submerged,afternoon,18.56687495,ng N2O g-1 DM hr-1
+TC_RSC_054_ACET,ACET,in-stream,I4,downstream,submerged,morning,19.70066309,ng N2O g-1 DM hr-1
+TC_RSC_055_ACET,ACET,in-stream,I4,downstream,submerged,morning,62.95497766,ng N2O g-1 DM hr-1
+TC_RSC_056_ACET,ACET,in-stream,I4,downstream,submerged,afternoon,166.9746768,ng N2O g-1 DM hr-1
+TC_RSC_057_ACET,ACET,in-stream,I4,downstream,island,morning,62.94618236,ng N2O g-1 DM hr-1
+TC_RSC_057_NO_ACET,NO_ACET,in-stream,I4,downstream,island,morning,40.51886955,ng N2O g-1 DM hr-1
+TC_RSC_058_ACET,ACET,in-stream,I4,downstream,island,afternoon,241.5179128,ng N2O g-1 DM hr-1
+TC_RSC_059_ACET,ACET,in-stream,I4,downstream,island,morning,89.93016904,ng N2O g-1 DM hr-1
+TC_RSC_060_ACET,ACET,in-stream,I4,downstream,island,afternoon,378.8399273,ng N2O g-1 DM hr-1
+TC_RSC_061_ACET,ACET,dry,D4,upstream,dry,afternoon,28.14536665,ng N2O g-1 DM hr-1
+TC_RSC_061_NO_ACET,NO_ACET,dry,D4,upstream,dry,afternoon,16.05147948,ng N2O g-1 DM hr-1
+TC_RSC_062_ACET,ACET,dry,D4,upstream,dry,morning,35.63282512,ng N2O g-1 DM hr-1
+TC_RSC_063_ACET,ACET,dry,D4,upstream,dry,morning,257.6258902,ng N2O g-1 DM hr-1
+TC_RSC_064_ACET,ACET,dry,D4,upstream,dry,afternoon,29.01842845,ng N2O g-1 DM hr-1
+TC_RSC_065_ACET,ACET,dry,D5,downstream,dry,morning,8.708964697,ng N2O g-1 DM hr-1
+TC_RSC_065_NO_ACET,NO_ACET,dry,D5,downstream,dry,morning,26.4146683,ng N2O g-1 DM hr-1
+TC_RSC_066_ACET,ACET,dry,D5,downstream,dry,afternoon,9.320907669,ng N2O g-1 DM hr-1
+TC_RSC_067_ACET,ACET,dry,D5,downstream,dry,morning,43.76256982,ng N2O g-1 DM hr-1
+TC_RSC_068_ACET,ACET,dry,D5,downstream,dry,afternoon,10.37454055,ng N2O g-1 DM hr-1

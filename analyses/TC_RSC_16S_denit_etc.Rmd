@@ -262,7 +262,41 @@ Relative abundance using funrar:
 otu_rel <- make_relative(as.matrix(otu_rarefied))
 ```
 
-Switch to StormwaterDenitrificationCF_ASM2.Rmd for template at this point?
+# RSC 2023 denitrification potential
+
+```{r import DEA data}
+# Read in denitrification rates from Town Creek DEA, 2023-01-31 sampling:
+denit_rates_WINTER <- read.csv("../data/20230131/TownCreek_RSC_DEA_20230131.csv")
+
+# Read in denitrification rates from Town Creek DEA, 2023-03-29 sampling:
+denit_rates_SPRING <- read.csv("../data/20230329/TownCreek_RSC_DEA_20230329.csv")
+
+# Read in denitrification rates from Town Creek DEA, 2023-06-21 sampling:
+denit_rates_SUMMER <- read.csv("../data/20230621/TownCreek_RSC_DEA_20230621.csv")
+
+# Read in denitrification rates from Town Creek DEA, 2023-12-05 sampling:
+denit_rates_FALL <- read.csv("../data/20231205/TownCreek_RSC_DEA_20231205.csv")
+
+# Pre-RSC denitrification rates, May 26, 2015:
+denit_PRE <- read.delim("../data/PreRSC20150526/2015_TC_DEArate.txt")
+denit_PRE$Replicate <- as.factor(denit_PRE$Replicate)
+```
+
+```{r sediment nitrogen data}
+# Read in N species concentration data:
+#sediment_N <- read.csv("~/GitHub/Denitrification_Enzyme_Assays/TownCreek/data/2023_SPRING_SUM_SoilKClExtracts.csv") # absolute path
+sediment_N <- read.csv("../data/2023_SPRING_SUM_SoilKClExtracts.csv") # relative path
+
+# Sediment N, dry mass corrected:
+sediment_N_DM <- read.csv("../data/NH4_NOX_per_dryMass.csv")
+
+sediment_N_DM_DEA4_Fall <- read.csv("../data/NH4_NOX_per_dryMass_DEA4.csv")
+```
+
+```{r import sediment pH data}
+sed_pH <- read.csv("../data/pH_TC_RSC.csv", header = T)
+sed_pH <- sed_pH[,1:7]
+```
 
 # Meta data (design) and wrangling
 
@@ -270,7 +304,7 @@ Switch to StormwaterDenitrificationCF_ASM2.Rmd for template at this point?
 # 2015 design file has already been read in as 'design_2015'
 
 #Read in design file for 2023 RSC DEAs
-meta <- read.csv("../data/Design_HC_LD.csv")
+design_2023_RSC_DEA <- read.csv("../data/Design_HC_LD.csv")
 ```
 
 ```{r wrangle meta data}

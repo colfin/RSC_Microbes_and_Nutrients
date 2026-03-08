@@ -1,0 +1,11 @@
+Sample_ID,Acetylene,RSC,Pool,Up_or_down,Water_column,Denitrification_rate,Unit_rate
+TC_RSC_001_ACET,ACET,in-stream,I1,upstream,submerged,119.74,ng N2O g-1 DM hr-1
+TC_RSC_001_NO_ACET,NO_ACET,in-stream,I1,upstream,submerged,17.99,ng N2O g-1 DM hr-1
+TC_RSC_002_ACET,ACET,in-stream,I1,upstream,submerged,27.21,ng N2O g-1 DM hr-1
+TC_RSC_003_ACET,ACET,in-stream,I4,downstream,submerged,30.72,ng N2O g-1 DM hr-1
+TC_RSC_004_ACET,ACET,in-stream,I4,downstream,island,69.18,ng N2O g-1 DM hr-1
+TC_RSC_005_ACET,ACET,dry,D4,upstream,dry,1.79,ng N2O g-1 DM hr-1
+TC_RSC_005_NO_ACET,NO_ACET,dry,D4,upstream,dry,0.52,ng N2O g-1 DM hr-1
+TC_RSC_006_ACET,ACET,dry,D4,upstream,dry,1.01,ng N2O g-1 DM hr-1
+TC_RSC_007_ACET,ACET,dry,D5,downstream,dry,-0.72,ng N2O g-1 DM hr-1
+TC_RSC_008_ACET,ACET,dry,D5,downstream,dry,0.18,ng N2O g-1 DM hr-1
