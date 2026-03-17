@@ -282,15 +282,19 @@ denit_PRE <- read.delim("../data/PreRSC20150526/2015_TC_DEArate.txt")
 denit_PRE$Replicate <- as.factor(denit_PRE$Replicate)
 ```
 
-```{r sediment nitrogen data}
-# Read in N species concentration data:
-#sediment_N <- read.csv("~/GitHub/Denitrification_Enzyme_Assays/TownCreek/data/2023_SPRING_SUM_SoilKClExtracts.csv") # absolute path
+```{r sediment nitrogen and carbon data}
+# Read in 2023 RSC N species concentration data:
+# CONSOLIDATE THESE NEXT 3 DFs?
 sediment_N <- read.csv("../data/2023_SPRING_SUM_SoilKClExtracts.csv") # relative path
 
-# Sediment N, dry mass corrected:
+# 2023 RSC Sediment N, dry mass corrected:
 sediment_N_DM <- read.csv("../data/NH4_NOX_per_dryMass.csv")
 
 sediment_N_DM_DEA4_Fall <- read.csv("../data/NH4_NOX_per_dryMass_DEA4.csv")
+
+# Sediment Total Carbon (TC) and Total Nitrogen (TN) from NCSU EAL (2024-10-14) (look in Desktop/PeraltaLab/Data/NCSU_EAL_CNH2_TC_WRC/Finlay_2024-10-14.xlsx):
+
+# 2015 "chem" data: 
 ```
 
 ```{r import sediment pH data}
