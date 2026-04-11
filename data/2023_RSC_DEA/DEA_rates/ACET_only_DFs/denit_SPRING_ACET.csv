@@ -1,0 +1,21 @@
+,Sample_ID,Acetylene,RSC,Pool,Up_or_down,Water_column,DEA_time,Denitrification_rate,Unit_rate
+1,TC_RSC_009_ACET,ACET,in-stream,I1,upstream,submerged,morning,25.78,ng N2O g-1 DM hr-1
+2,TC_RSC_010_ACET,ACET,in-stream,I1,upstream,submerged,morning,9.54,ng N2O g-1 DM hr-1
+3,TC_RSC_011_ACET,ACET,in-stream,I1,upstream,submerged,morning,12.56,ng N2O g-1 DM hr-1
+4,TC_RSC_012_ACET,ACET,in-stream,I1,upstream,submerged,morning,430.94,ng N2O g-1 DM hr-1
+5,TC_RSC_013_ACET,ACET,in-stream,I4,downstream,submerged,afternoon,10.72,ng N2O g-1 DM hr-1
+6,TC_RSC_014_ACET,ACET,in-stream,I4,downstream,submerged,morning,17.23,ng N2O g-1 DM hr-1
+7,TC_RSC_015_ACET,ACET,in-stream,I4,downstream,submerged,afternoon,2.46,ng N2O g-1 DM hr-1
+8,TC_RSC_016_ACET,ACET,in-stream,I4,downstream,submerged,morning,29.12,ng N2O g-1 DM hr-1
+9,TC_RSC_017_ACET,ACET,in-stream,I4,downstream,island,afternoon,27.66,ng N2O g-1 DM hr-1
+10,TC_RSC_018_ACET,ACET,in-stream,I4,downstream,island,afternoon,42.11,ng N2O g-1 DM hr-1
+11,TC_RSC_019_ACET,ACET,in-stream,I4,downstream,island,afternoon,23.2,ng N2O g-1 DM hr-1
+12,TC_RSC_020_ACET,ACET,in-stream,I4,downstream,island,morning,29.49,ng N2O g-1 DM hr-1
+13,TC_RSC_021_ACET,ACET,dry,D4,upstream,dry,afternoon,18.74,ng N2O g-1 DM hr-1
+14,TC_RSC_022_ACET,ACET,dry,D4,upstream,dry,morning,16.98,ng N2O g-1 DM hr-1
+15,TC_RSC_023_ACET,ACET,dry,D4,upstream,dry,morning,2.56,ng N2O g-1 DM hr-1
+16,TC_RSC_024_ACET,ACET,dry,D4,upstream,dry,afternoon,7.11,ng N2O g-1 DM hr-1
+17,TC_RSC_025_ACET,ACET,dry,D5,downstream,dry,afternoon,3.23,ng N2O g-1 DM hr-1
+18,TC_RSC_026_ACET,ACET,dry,D5,downstream,dry,afternoon,0.74,ng N2O g-1 DM hr-1
+19,TC_RSC_027_ACET,ACET,dry,D5,downstream,dry,afternoon,12.64,ng N2O g-1 DM hr-1
+20,TC_RSC_028_ACET,ACET,dry,D5,downstream,dry,morning,2.11,ng N2O g-1 DM hr-1

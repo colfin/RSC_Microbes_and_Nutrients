@@ -260,6 +260,17 @@ Relative abundance using funrar:
 - relative_abundance <- make_relative(as.matrix(Numerical))
 ```{r relative abundance}
 otu_rel <- make_relative(as.matrix(otu_rarefied))
+
+# sanity check and TC_RSC count
+dim(otu_rel)
+# Count row names starting with "TC_RSC"
+count <- sum(startsWith(rownames(otu_rel), "TC_RSC"))
+count_pre <- sum(startsWith(rownames(otu_rel), "GSF"))
+count_pre_2 <- sum(design_2015$Sample_Type %in% c("BD", "BK"))
+# Print the result
+print(count) # 60
+print(count_pre) # 18
+count_pre_2 # 18
 ```
 
 # RSC 2023 denitrification potential
@@ -297,20 +308,73 @@ WaterSed.chem_2015$Field_replicate <- as.factor(WaterSed.chem_2015$Field_replica
 
 ```{r read in meta data}
 # 2015 design file has already been read in as 'design_2015'
+# Create subset that only contains sediment samples
+design_2015_sed <- design_2015 %>%
+  filter(Sample_Type %in% c("BD", "BK"))
 
 # Is there a design file for 2023 RSC?
+# No, must wrangle
+
+# first, remove acetylene free samples
 ```
 
-```{r wrangle meta data}
-# remove underscores form meta sampleIDs and make row names
-rownames(meta) <- gsub(pattern = "_", replacement = "", x = meta$SampleID)
+```{r remove NO_ACET}
+# Winter:
+denit_ACET_WINTER <- dplyr::filter(denit_rates_WINTER, denit_rates_WINTER$Acetylene == "ACET", .preserve = TRUE)
 
+# Spring:
+denit_SPRING_ACET <- dplyr::filter(denit_rates_SPRING, denit_rates_SPRING$Acetylene == "ACET", .preserve = TRUE)
+
+# Summer:
+denit_SUMMER_ACET <- dplyr::filter(denit_rates_SUMMER, denit_rates_SUMMER$Acetylene == "ACET", .preserve = TRUE)
+
+# Summer:
+denit_FALL_ACET <- dplyr::filter(denit_rates_FALL, denit_rates_FALL$Acetylene == "ACET", .preserve = TRUE)
+```
+
+```{r write out acetylene only data frames}
+# I need to assemble a unified meta df with acetylene only samples to represent the denitrification potential
+# Do not include WINTER because no amplicon sequencing data for WINTER
+
+# Spring
+write.csv(denit_SPRING_ACET, file = "../data/2023_RSC_DEA/DEA_rates/ACET_only_DFs/denit_SPRING_ACET.csv")
+
+# Summer
+#reduce data frame to two key columns
+denit_SUMMER_ACET_out <- denit_SUMMER_ACET[,c("Sample_ID", "RSC", "Water_column")]
+  
+write.csv(denit_SUMMER_ACET_out, file = "../data/2023_RSC_DEA/DEA_rates/ACET_only_DFs/denit_SUMMER_ACET.csv")
+
+# Fall
+#reduce data frame to two key columns
+denit_FALL_ACET_out <- denit_FALL_ACET[,c("Sample_ID", "RSC", "Water_column")]
+  
+write.csv(denit_FALL_ACET_out, file = "../data/2023_RSC_DEA/DEA_rates/ACET_only_DFs/denit_FALL_ACET.csv")
+```
+
+```{r read in and wrangle pre- and post-RSC unified metadata}
+# read in data
+uni_meta <- read.csv("../data/unified_meta.csv")
+
+# make row names
+rownames(uni_meta) <- uni_meta$row_name
+
+# remove row_name column
+uni_meta <- uni_meta[,-1]
+```
+
+
+```{r wrangle meta data}
 # remove barcodes from otu_rel row names
-# This selects and keeps only the first 7 characters of each row name
-rownames(otu_rel) <- substr(rownames(otu_rel), start = 1, stop = 7)
+# This selects and keeps only the first 16 characters of each row name
+rownames(otu_rel) <- substr(rownames(otu_rel), start = 1, stop = 16)
+
+# Cut out pool name from otu_rel names
+
 
 # Get the row names from 'otu_rel' (the data frame with fewer rows)
-matching_samples <- rownames(otu_rel)
+#matching_samples <- rownames(otu_rel)
+# all equal?
 
 # 1. Filter and reorder 'meta' to match 'otu_rel'
 meta_filtered <- meta[matching_samples, ]
