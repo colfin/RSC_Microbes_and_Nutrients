@@ -38,6 +38,7 @@ require("sf")
 require("NSM3")
 require("gdm")
 require("ARTool")
+require("stringr")
 ```
 
 ```{r Bioconductor install and load}
@@ -337,19 +338,19 @@ denit_FALL_ACET <- dplyr::filter(denit_rates_FALL, denit_rates_FALL$Acetylene ==
 # Do not include WINTER because no amplicon sequencing data for WINTER
 
 # Spring
-write.csv(denit_SPRING_ACET, file = "../data/2023_RSC_DEA/DEA_rates/ACET_only_DFs/denit_SPRING_ACET.csv")
+#write.csv(denit_SPRING_ACET, file = "../data/2023_RSC_DEA/DEA_rates/ACET_only_DFs/denit_SPRING_ACET.csv")
 
 # Summer
 #reduce data frame to two key columns
-denit_SUMMER_ACET_out <- denit_SUMMER_ACET[,c("Sample_ID", "RSC", "Water_column")]
+#denit_SUMMER_ACET_out <- denit_SUMMER_ACET[,c("Sample_ID", "RSC", "Water_column")]
   
-write.csv(denit_SUMMER_ACET_out, file = "../data/2023_RSC_DEA/DEA_rates/ACET_only_DFs/denit_SUMMER_ACET.csv")
+#write.csv(denit_SUMMER_ACET_out, file = "../data/2023_RSC_DEA/DEA_rates/ACET_only_DFs/denit_SUMMER_ACET.csv")
 
 # Fall
 #reduce data frame to two key columns
-denit_FALL_ACET_out <- denit_FALL_ACET[,c("Sample_ID", "RSC", "Water_column")]
+#denit_FALL_ACET_out <- denit_FALL_ACET[,c("Sample_ID", "RSC", "Water_column")]
   
-write.csv(denit_FALL_ACET_out, file = "../data/2023_RSC_DEA/DEA_rates/ACET_only_DFs/denit_FALL_ACET.csv")
+#write.csv(denit_FALL_ACET_out, file = "../data/2023_RSC_DEA/DEA_rates/ACET_only_DFs/denit_FALL_ACET.csv")
 ```
 
 ```{r read in and wrangle pre- and post-RSC unified metadata}
@@ -363,29 +364,44 @@ rownames(uni_meta) <- uni_meta$row_name
 uni_meta <- uni_meta[,-1]
 ```
 
-
 ```{r wrangle meta data}
+# Cut out "_ACET" from uni_meta
+rownames(uni_meta) <- str_remove(rownames(uni_meta), "_ACET$")
+
 # remove barcodes from otu_rel row names
-# This selects and keeps only the first 16 characters of each row name
-rownames(otu_rel) <- substr(rownames(otu_rel), start = 1, stop = 16)
+rownames(otu_rel) <- str_remove(rownames(otu_rel), "_bc\\d{3}$")
 
 # Cut out pool name from otu_rel names
+# 1. Define the patterns joined by the OR operator "|"
+# Notice that "_IS_P4i" comes before "_IS_P4"
+strings_to_remove <- "_Dr_P4|_Dr_P5|_IS_P1|_IS_P4i|_IS_P4"
 
+# 2. Remove the variable strings
+rownames(otu_rel) <- str_remove(rownames(otu_rel), strings_to_remove)
 
-# Get the row names from 'otu_rel' (the data frame with fewer rows)
-#matching_samples <- rownames(otu_rel)
-# all equal?
+# In uni_meta, convert submerged and island to BD (stream bed) and BK (stream bank)
+uni_meta <- uni_meta %>%
+  mutate(Sample_Type = case_match(Sample_Type,
+                                  "submerged" ~ "BD",
+                                  "island" ~ "BK",
+                                  .default = Sample_Type)) # Keeps anything else (like "unknown") as is
 
-# 1. Filter and reorder 'meta' to match 'otu_rel'
-meta_filtered <- meta[matching_samples, ]
+# In uni_meta, add a column for pre- vs. post- RSC
+uni_meta <- uni_meta %>%
+  mutate(PreVsPost = case_match(Location,
+                                c("B", "C", "D") ~ "Pre-RSC",
+                                c("in-stream", "dry") ~ "Post-RSC",
+                                .default = NA_character_))
+
 
 # 2. Now cbind the two data frames, which have identical row names and order
-meta_otu <- cbind(meta_filtered, otu_rel)
+meta_otu <- cbind(uni_meta, otu_rel)
 
 # (Optional) Check the dimensions to confirm
-dim(meta_otu) 
-# This should show 49 rows
+dim(meta_otu) # 78 164676
 ```
+
+## RESUME CODING HERE AFTER 4/20/2026
 
 ```{r set factors}
 meta_otu$Site <- as.factor(meta_otu$Site)
@@ -404,8 +420,6 @@ metaotu.ad.2 # The interaction between field/buffer and Treatment_salt makes thi
 
 metaotu.ad.3 <- adonis2(meta_otu[,-c(1:5)] ~ Treatment_salt, method = "bray", data = meta_otu, perm=10000, set.seed=42, by = "terms")
 metaotu.ad.3 # Treatment_salt overlaps with field/buffer categories too much, not very informative
-
-# For treatment_salt (Hyde) and maybe Field_Location (if not redundant), analyze within Hyde (and maybe within Pitt)
 ```
 
 # Denitrification and soil parameters
