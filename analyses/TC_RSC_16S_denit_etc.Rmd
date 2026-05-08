@@ -34,10 +34,10 @@ require("NSM3")
 require("ggpmisc")
 require("funrar")
 require("glue")
-require("sf")
+#require("sf")
 require("NSM3")
-require("gdm")
-require("ARTool")
+#require("gdm")
+#require("ARTool")
 require("stringr")
 ```
 
@@ -46,18 +46,18 @@ require("stringr")
    # install.packages("BiocManager")
 #BiocManager::install(version = "3.22")
 
-require("BiocManager")
+#require("BiocManager")
 ```
 
 ```{r Phyloseq install and load}
 #source("https://raw.githubusercontent.com/joey711/phyloseq/master/inst/scripts/installer.R",
-    #   local = TRUE)
+      #local = TRUE)
 
 #install_phyloseq(branch = "github")
 
-require("phyloseq")
+#require("phyloseq")
 
-packageVersion('phyloseq')
+#packageVersion('phyloseq')
 ```
 
 ```{r Standard error and confidence intervals}
@@ -222,7 +222,7 @@ p_TC_OTUs_3
 
 ## Rarefaction
 
-```{r Gemini rarefaction}
+```{r rarefaction}
 # --- Start here with 'otu_TC_sed' data frame ---
 
 # 1. Find the minimum sample size (library depth) for rarefaction
@@ -274,7 +274,7 @@ print(count_pre) # 18
 count_pre_2 # 18
 ```
 
-# RSC 2023 denitrification potential
+# Read in RSC denitrification potential 
 
 ```{r import DEA data}
 # Read in denitrification rates from Town Creek DEA, 2023-01-31 sampling:
@@ -415,48 +415,133 @@ meta_otu$PreVsPost <- as.factor(meta_otu$PreVsPost)
 meta_otu$Season <- as.factor(meta_otu$Season)
 ```
 
-# PERMANOVA
+# PERMANOVA and PERMDISP
 
 ```{r PERMANOVA}
+# Overall PERMANOVA
 metaotu.ad <- adonis2(meta_otu[,-c(1:5)] ~ (PreVsPost + Sample_Type + Season)^2, 
                       method = "bray", 
                       data = meta_otu, 
                       perm = 10000, 
                       by = "terms")
 
-metaotu.ad
-```
+metaotu.ad # strong interactions are an issue for interpretation. One issue is that dry has no pre-RSC comparison. Season also does not have pre- vs. post- comparisons across seasons (could try a spring vs. spring)
 
-# RESUME CODING HERE 4/21/2026
+# Create a meta_otu df without dry samples
+meta_otu_noDry <- meta_otu %>%
+  filter(Sample_Type != "dry")
+
+# PERMANOVA no dry
+metaotu.ad.noDry <- adonis2(meta_otu_noDry[,-c(1:5)] ~ (PreVsPost + Sample_Type + Season)^2, 
+                      method = "bray", 
+                      data = meta_otu_noDry, 
+                      perm = 10000, 
+                      by = "terms")
+
+metaotu.ad.noDry
+```
 
 ```{r PERMDISP}
 # 1. Create the distance matrix
 dist_matrix <- vegdist(otu_rel, method = "bray")
 
-# 2. Run PERMDISP (betadisper)
+# 2. Run PERMDISP (betadisper) : Pre vs. Post
 # 'groups' should be a vector or factor from your metadata
-disper_out <- betadisper(dist_matrix, group = meta_otu$Site)
+disper_out <- betadisper(dist_matrix, group = meta_otu$PreVsPost)
 
 # 3. Test for significance using a permutation test
 perm_test <- permutest(disper_out, permutations = 10000)
-print(perm_test) # Insignificant. W/ sig. permanova, indicates true location effect
+print(perm_test) # Significant: may not be true location effect seen in PERMANOVA
 
 # 4. Visualize the dispersion
 plot(disper_out)
-boxplot(disper_out)
+boxplot(disper_out) # Post-RSC has far greater dispersion
 
-# Now repeat with buffer vs. field
+# Now repeat with Sample Type
 
 # 2. Run PERMDISP (betadisper)
 # 'groups' should be a vector or factor from your metadata
-disper_out_field_buff <- betadisper(dist_matrix, group = meta_otu$Field_or_Buffer)
+disper_out_sample_type <- betadisper(dist_matrix, group = meta_otu$Sample_Type)
 
 # 3. Test for significance using a permutation test
-perm_test_field_buff <- permutest(disper_out_field_buff, permutations = 10000)
-print(perm_test_field_buff) # Insignificant. W/ sig. permanova, indicates true location effect
+perm_test_sample_type <- permutest(disper_out_sample_type, permutations = 10000)
+print(perm_test_sample_type) # Insignificant. W/ sig. permanova, indicates true location effect
 
 # 4. Visualize the dispersion
-plot(disper_out_field_buff)
-boxplot(disper_out_field_buff)
+plot(disper_out_sample_type)
+boxplot(disper_out_sample_type)
+
+# Now repeat with Season
+# 2. Run PERMDISP (betadisper)
+# 'groups' should be a vector or factor from your metadata
+disper_out_season <- betadisper(dist_matrix, group = meta_otu$Season)
+
+# 3. Test for significance using a permutation test
+perm_test_season <- permutest(disper_out_season, permutations = 10000)
+print(perm_test_season) # Insignificant. W/ sig. permanova, indicates true location effect
+
+# 4. Visualize the dispersion
+plot(disper_out_season)
+boxplot(disper_out_season)
+
+# Now repeat with Location
+# 2. Run PERMDISP (betadisper)
+# 'groups' should be a vector or factor from your metadata
+disper_out_location <- betadisper(dist_matrix, group = meta_otu$Location)
+
+# 3. Test for significance using a permutation test
+perm_test_location <- permutest(disper_out_location, permutations = 10000)
+print(perm_test_location) # Significant dispersion effect
+
+# 4. Visualize the dispersion
+plot(disper_out_location)
+boxplot(disper_out_location)
 ```
 
+# Denitrification and sediment properties: figures and stats
+
+```{r compile 2023 denit seasonal data frames}
+# Combine the 4 2023 post-RSC denit data frames
+denit_ACET_all <- bind_rows(
+  denit_ACET_WINTER |> mutate(Season = "Winter"),
+  denit_SPRING_ACET |> dplyr::select(-DEA_time) |> mutate(Season = "Spring"),
+  denit_SUMMER_ACET |> dplyr::select(-DEA_time) |> mutate(Season = "Summer"),
+  denit_FALL_ACET   |> dplyr::select(-DEA_time) |> mutate(Season = "Fall")
+)
+
+# Add on the 2015 denit data
+# First, subset to only sediment samples
+Sed.chem_2015 <- WaterSed.chem_2015 |>
+  dplyr::filter(Sample_Type != "W")
+
+# Add season column
+Sed.chem_2015$Season <- "Spring"
+
+# Remove unnecessary columns
+Sed.chem_2015 <- Sed.chem_2015 |>
+  dplyr::select(c("Sample_Code", "Sample_Type", "Location", "DEArate_ACET", "SED.NH4.N.ug.N.g.1.soil", "SED.NO3.N.ug.N.g.1.soil", "Season"))
+
+# Rename columns
+Sed.chem_2015 <- Sed.chem_2015 |>
+  dplyr::rename(
+    Sample_ID = `Sample_Code`,
+  )
+
+denit_2023 <- denit_ACET_all |>
+  dplyr::rename(
+    Sample_Type = `Water_column`,
+    DEArate_ACET = `Denitrification_rate`,
+    Location = `Up_or_down`
+  )
+
+# Simplify columns again for both DFs, only Sample_ID, Sample_Type, Location, Season, and DEArate_ACET
+denit_2015 <- Sed.chem_2015 |>
+  dplyr::select(c("Sample_ID", "Sample_Type", "Location", "Season", "DEArate_ACET"))
+
+denit_2023 <- denit_2023 |>
+  dplyr::select(c("Sample_ID", "Sample_Type", "Location", "Season", "DEArate_ACET"))
+
+# Add on PreVsPost to both DFs before combining
+```
+
+# RESUME CODING JUST ABOVE (5/8/26)
